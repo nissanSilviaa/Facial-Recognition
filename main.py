@@ -10,25 +10,25 @@ from facenet_pytorch import MTCNN
 from torchvision import transforms
 from deepface import DeepFace
 
-# --- Configuration ---
+#Config
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-CKPT_DIR = './checkpoints'  # folder where models are saved
+CKPT_DIR = 'models'  # folder where models are saved
 EMB_DB_PATH = './embeddings_db.pkl'
 DIST_THRESHOLD = 0.8  # euclidean threshold for identity match 
 
-# --- Load Models ---
 # Face detector & aligner
 mtcnn = MTCNN(image_size=64, margin=0, keep_all=False, device=DEVICE)
-# Embedding network
+
+#Model
 embed_net = torch.load(os.path.join(CKPT_DIR, 'embed_net_full.pt'), map_location=DEVICE)
 embed_net.eval()
-# Preprocessing transform (matches training)
+
+
 val_transform = transforms.Compose([
     transforms.ToTensor(),
     transforms.Normalize([0.5]*3, [0.5]*3)
 ])
-
-# --- Utility Functions ---
+#Module for liveness detection and antispoofing
 def is_live_face(pil_face, thresh=100.0):
     gray = cv2.cvtColor(np.array(pil_face), cv2.COLOR_RGB2GRAY)
     lap = cv2.Laplacian(gray, cv2.CV_64F)
@@ -39,12 +39,12 @@ def detect_emotion(pil_face):
     result = DeepFace.analyze(img, actions=['emotion'], enforce_detection=False)
     return result['dominant_emotion']
 
-# --- Embedding DB ---
+#Embedding DB
 if os.path.exists(EMB_DB_PATH):
     with open(EMB_DB_PATH, 'rb') as f:
         emb_db = pickle.load(f)
 else:
-    emb_db = {}  # name -> embedding (numpy array)
+    emb_db = {} 
 
 class FaceApp:
     def __init__(self, master):
