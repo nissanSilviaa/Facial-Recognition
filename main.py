@@ -26,7 +26,7 @@ if os.path.exists(EMB_DB_PATH):
 else:
     emb_db = {}
 
-def is_live_face(pil_face, thresh=500.0):
+def is_live_face(pil_face, thresh=100.0):
     gray = cv2.cvtColor(np.array(pil_face), cv2.COLOR_RGB2GRAY)
     lap = cv2.Laplacian(gray, cv2.CV_64F)
     return lap.var() >= thresh
@@ -120,7 +120,7 @@ class FaceApp(tk.Tk):
         return name
 
 if __name__ == '__main__':
-    #app = FaceApp()
-    #app.mainloop()
+    app = FaceApp()
+    app.mainloop()
     batch_test_liveness("faces/real")
     batch_test_liveness("faces/spoof")
