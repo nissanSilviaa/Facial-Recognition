@@ -20,7 +20,7 @@ DIST_THRESHOLD = 0.8  # euclidean threshold for identity match
 mtcnn = MTCNN(image_size=64, margin=0, keep_all=False, device=DEVICE)
 
 #Model
-embed_net = torch.load(os.path.join(CKPT_DIR, 'embed_net_full.pt'), map_location=DEVICE)
+embed_net = torch.load(os.path.join(CKPT_DIR, 'Josh_Face_Net.pt'), map_location=DEVICE)
 embed_net.eval()
 
 
