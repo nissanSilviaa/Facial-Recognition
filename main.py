@@ -1,89 +1,86 @@
 import os
 import pickle
-import tkinter as tk
-from tkinter import filedialog, simpledialog, messagebox
 import numpy as np
+import torch
 import cv2
 from PIL import Image, ImageTk
-import torch
+import tkinter as tk
+from tkinter import filedialog, simpledialog, messagebox
 from facenet_pytorch import MTCNN
-from torchvision import transforms
 from deepface import DeepFace
 
-#Config
+# --- Configuration ---
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-CKPT_DIR = 'models'  # folder where models are saved
-EMB_DB_PATH = './embeddings_db.pkl'
-DIST_THRESHOLD = 0.8  # euclidean threshold for identity match 
+CKPT_DIR = 'models'
+EMB_DB_PATH = 'embeddings_db.pkl'
+DIST_THRESHOLD = 0.8            # threshold for 1-NN identity match
 
-# Face detector & aligner
 mtcnn = MTCNN(image_size=64, margin=0, keep_all=False, device=DEVICE)
-
-#Model
 embed_net = torch.load(os.path.join(CKPT_DIR, 'Josh_Face_Net.pt'), map_location=DEVICE)
 embed_net.eval()
 
+#Database
+if os.path.exists(EMB_DB_PATH):
+    with open(EMB_DB_PATH, 'rb') as f:
+        emb_db = pickle.load(f)
+else:
+    emb_db = {}
 
-val_transform = transforms.Compose([
-    transforms.ToTensor(),
-    transforms.Normalize([0.5]*3, [0.5]*3)
-])
-#Module for liveness detection and antispoofing
 def is_live_face(pil_face, thresh=100.0):
     gray = cv2.cvtColor(np.array(pil_face), cv2.COLOR_RGB2GRAY)
     lap = cv2.Laplacian(gray, cv2.CV_64F)
     return lap.var() >= thresh
 
+
 def detect_emotion(pil_face):
     img = np.array(pil_face)
     result = DeepFace.analyze(img, actions=['emotion'], enforce_detection=False)
+    # DeepFace may return a list for batch results
+    if isinstance(result, list):
+        result = result[0]
     return result['dominant_emotion']
 
-#Embedding DB
-if os.path.exists(EMB_DB_PATH):
-    with open(EMB_DB_PATH, 'rb') as f:
-        emb_db = pickle.load(f)
-else:
-    emb_db = {} 
-
-class FaceApp:
-    def __init__(self, master):
-        self.master = master
-        master.title('Face Attendance System')
-        self.label = tk.Label(master, text='Select an image')
-        self.label.pack()
-        self.img_panel = tk.Label(master)
-        self.img_panel.pack()
-        self.process_btn = tk.Button(master, text='Load Image', command=self.load_image)
-        self.process_btn.pack()
+class FaceApp(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title('Face Attendance System')
+        self.label = tk.Label(self, text='Select an image')
+        self.label.pack(pady=10)
+        self.img_panel = tk.Label(self)
+        self.img_panel.pack(pady=10)
+        self.process_btn = tk.Button(self, text='Load Image', command=self.load_image)
+        self.process_btn.pack(pady=10)
 
     def load_image(self):
-        path = filedialog.askopenfilename(filetypes=[('Image files', '*.jpg *.jpeg *.png')])
+        path = filedialog.askopenfilename(filetypes=[('Image files','*.jpg *.jpeg *.png')])
         if not path:
             return
-        # Show image
         img = Image.open(path).resize((256,256))
         self.img_panel.img = ImageTk.PhotoImage(img)
         self.img_panel.config(image=self.img_panel.img)
-        # Process
         self.process_face(path)
 
     def process_face(self, img_path):
-        # 1) detect & crop
-        orig = cv2.imread(img_path)
-        face_tensor = mtcnn(orig)
-        if face_tensor is None:
-            messagebox.showerror('Error', 'No face detected')
-            return
-        pil_face = transforms.ToPILImage()((face_tensor * 255).byte())
-        # 2) liveness
-        live = is_live_face(pil_face)
-        if not live:
+        # 1) Load and resize face
+        pil_img_full = Image.open(img_path).convert('RGB')
+        pil_face = pil_img_full.resize((64,64))
+
+        # 2) Convert to tensor
+        arr = np.array(pil_face)
+        tensor = torch.tensor(arr, dtype=torch.float32, device=DEVICE)
+        tensor = tensor.permute(2,0,1) / 255.0
+        tensor = (tensor - 0.5) / 0.5
+        face_tensor = tensor.unsqueeze(0)
+
+        # 3) Liveness check
+        if not is_live_face(pil_face):
             messagebox.showwarning('Spoof', 'Spoof detected!')
             return
-        # 3) embedding
-        emb = embed_net(val_transform(pil_face).unsqueeze(0).to(DEVICE)).cpu().detach().numpy()[0]
-        # 4) identify or register
+
+        # 4) Embedding & identification
+        emb_tensor = embed_net(face_tensor).cpu().detach().squeeze(0)
+        emb = emb_tensor.tolist()
+        identity = None
         if emb_db:
             names = list(emb_db.keys())
             embs = np.vstack([emb_db[n] for n in names])
@@ -91,24 +88,23 @@ class FaceApp:
             idx = np.argmin(dists)
             if dists[idx] < DIST_THRESHOLD:
                 identity = names[idx]
-            else:
-                identity = self.register_new(emb)
-        else:
+        if identity is None:
             identity = self.register_new(emb)
-        # 5) emotion
+
+        # 5) Emotion detection
         emotion = detect_emotion(pil_face)
+
         messagebox.showinfo('Result', f'Identity: {identity}\nEmotion: {emotion}')
 
     def register_new(self, emb):
-        name = simpledialog.askstring('Register', 'Enter name for new identity:')
+        name = simpledialog.askstring('Register','Enter name for new identity:')
         if not name:
             return 'Unknown'
         emb_db[name] = emb
-        with open(EMB_DB_PATH, 'wb') as f:
+        with open(EMB_DB_PATH,'wb') as f:
             pickle.dump(emb_db, f)
         return name
 
 if __name__ == '__main__':
-    root = tk.Tk()
-    app = FaceApp(root)
-    root.mainloop()
+    app = FaceApp()
+    app.mainloop()
