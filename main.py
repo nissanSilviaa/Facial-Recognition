@@ -6,16 +6,14 @@ import cv2
 from PIL import Image, ImageTk
 import tkinter as tk
 from tkinter import filedialog, simpledialog, messagebox
-from facenet_pytorch import MTCNN
 from deepface import DeepFace
 
 # --- Configuration ---
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 CKPT_DIR = 'models'
 EMB_DB_PATH = 'embeddings_db.pkl'
-DIST_THRESHOLD = 0.8            # threshold for 1-NN identity match
+DIST_THRESHOLD = 5            # threshold for 1-NN identity match
 
-mtcnn = MTCNN(image_size=64, margin=0, keep_all=False, device=DEVICE)
 embed_net = torch.load(os.path.join(CKPT_DIR, 'Josh_Face_Net.pt'), map_location=DEVICE)
 embed_net.eval()
 
@@ -57,7 +55,7 @@ class FaceApp(tk.Tk):
         path = filedialog.askopenfilename(filetypes=[('Image files','*.jpg *.jpeg *.png')])
         if not path:
             return
-        img = Image.open(path).resize((256,256))
+        img = Image.open(path).resize((64,64))
         self.img_panel.img = ImageTk.PhotoImage(img)
         self.img_panel.config(image=self.img_panel.img)
         self.process_face(path)
@@ -94,8 +92,8 @@ class FaceApp(tk.Tk):
 
         # 5) Emotion detection
         emotion = detect_emotion(pil_face)
-
-        messagebox.showinfo('Result', f'Identity: {identity}\nEmotion: {emotion}')
+        print(dists[idx])
+        messagebox.showinfo('Result', f'Identity: {identity},\nEmotion: {emotion}')
 
     def register_new(self, emb):
         name = simpledialog.askstring('Register','Enter name for new identity:')
