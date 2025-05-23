@@ -31,19 +31,7 @@ def is_live_face(pil_face, thresh=100.0):
     lap = cv2.Laplacian(gray, cv2.CV_64F)
     return lap.var() >= thresh
 
-def batch_test_liveness(folder):
-    files = [
-        f for f in os.listdir(folder)
-        if f.lower().endswith(('.jpg','.jpeg','.png'))
-    ]
-    total = len(files)
-    live = 0
-    for fn in files:
-        img = Image.open(os.path.join(folder, fn)).convert('RGB').resize((64,64))
-        if is_live_face(img):
-            live += 1
-    spoof = total - live
-    print(f"{folder}: {total} images → {live} live, {spoof} spoof")
+
 
 
 def detect_emotion(pil_face):
@@ -86,7 +74,6 @@ class FaceApp(tk.Tk):
         tensor = (tensor - 0.5) / 0.5
         face_tensor = tensor.unsqueeze(0)
 
-        # 3) Liveness check
         if not is_live_face(pil_face):
             messagebox.showwarning('Spoof', 'Spoof detected!')
             return
@@ -122,5 +109,3 @@ class FaceApp(tk.Tk):
 if __name__ == '__main__':
     app = FaceApp()
     app.mainloop()
-    batch_test_liveness("faces/real")
-    batch_test_liveness("faces/spoof")
