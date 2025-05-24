@@ -72,7 +72,7 @@ class FaceApp(tk.Tk):
         tensor = (tensor - 0.5) / 0.5
         face_tensor = tensor.unsqueeze(0)
 
-        if not is_live_face(pil_face):
+        if not is_live_face(pil_img_full):
             messagebox.showwarning('Spoof', 'Spoof detected!')
             return
 
