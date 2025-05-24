@@ -60,11 +60,11 @@ class FaceApp(tk.Tk):
         self.process_face(path)
 
     def process_face(self, img_path):
-        # 1) Load and resize face
+        # Load and resize face
         pil_img_full = Image.open(img_path).convert('RGB')
         pil_face = pil_img_full.resize((64,64))
 
-        # 2) Convert to tensor
+        # Convert to tensor
         arr = np.array(pil_face)
         tensor = torch.tensor(arr, dtype=torch.float32, device=DEVICE)
         tensor = tensor.permute(2,0,1) / 255.0
@@ -75,7 +75,7 @@ class FaceApp(tk.Tk):
             messagebox.showwarning('Spoof', 'Spoof detected!')
             return
 
-        # 4) Embedding & identification
+        # Embedding & identification
         emb_tensor = embed_net(face_tensor).cpu().detach().squeeze(0)
         emb = emb_tensor.tolist()
         identity = None
@@ -89,7 +89,7 @@ class FaceApp(tk.Tk):
         if identity is None:
             identity = self.register_new(emb)
 
-        # 5) Emotion detection
+        # Emotion detection
         emotion = detect_emotion(pil_face)
         print(dists[idx])
         messagebox.showinfo('Result', f'Identity: {identity},\nEmotion: {emotion}')
