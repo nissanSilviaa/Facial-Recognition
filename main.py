@@ -35,7 +35,6 @@ def is_live_face(pil_face, thresh=100.0):
 def detect_emotion(pil_face):
     img = np.array(pil_face)
     result = DeepFace.analyze(img, actions=['emotion'], enforce_detection=False)
-    # DeepFace may return a list for batch results
     if isinstance(result, list):
         result = result[0]
     return result['dominant_emotion']
